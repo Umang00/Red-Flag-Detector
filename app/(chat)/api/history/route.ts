@@ -3,6 +3,8 @@ import { auth } from "@/app/(auth)/auth";
 import { deleteAllChatsByUserId, getChatsByUserId } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 
+export const runtime = "nodejs"; // Force Node.js runtime for auth with database/bcrypt
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
 
