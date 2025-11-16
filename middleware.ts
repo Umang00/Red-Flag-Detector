@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import NextAuth from "next-auth";
 import { authConfig } from "@/app/(auth)/auth.config";
-import { guestRegex } from "./lib/constants";
+
+const guestRegex = /^guest-\d+$/;
 
 const { auth } = NextAuth(authConfig);
 
