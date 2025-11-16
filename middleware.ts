@@ -1,45 +1,50 @@
-import { type NextRequest, NextResponse } from "next/server";
 import NextAuth from "next-auth";
-import { authConfig } from "@/app/(auth)/auth.config";
+import type { NextAuthConfig } from "next-auth";
 
 const guestRegex = /^guest-\d+$/;
 
-const { auth } = NextAuth(authConfig);
+// Edge-compatible NextAuth config (no database adapter)
+const authConfig = {
+  pages: {
+    signIn: "/login",
+    newUser: "/",
+  },
+  providers: [],
+  callbacks: {
+    authorized({ auth, request: { nextUrl } }) {
+      const { pathname } = nextUrl;
 
-export default auth(async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+      // Playwright ping endpoint
+      if (pathname.startsWith("/ping")) {
+        return true;
+      }
 
-  /*
-   * Playwright starts the dev server and requires a 200 status to
-   * begin the tests, so this ensures that the tests can start
-   */
-  if (pathname.startsWith("/ping")) {
-    return new Response("pong", { status: 200 });
-  }
+      // Allow auth endpoints
+      if (pathname.startsWith("/api/auth")) {
+        return true;
+      }
 
-  if (pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
-  }
+      const isLoggedIn = !!auth?.user;
 
-  // @ts-expect-error - auth is attached to request by NextAuth
-  const session = request.auth;
+      // Redirect to guest login if not logged in
+      if (!isLoggedIn) {
+        const redirectUrl = encodeURIComponent(nextUrl.toString());
+        return Response.redirect(new URL(`/api/auth/guest?redirectUrl=${redirectUrl}`, nextUrl));
+      }
 
-  if (!session) {
-    const redirectUrl = encodeURIComponent(request.url);
+      const isGuest = guestRegex.test(auth?.user?.email ?? "");
 
-    return NextResponse.redirect(
-      new URL(`/api/auth/guest?redirectUrl=${redirectUrl}`, request.url)
-    );
-  }
+      // Redirect logged-in non-guest users away from auth pages
+      if (isLoggedIn && !isGuest && ["/login", "/register"].includes(pathname)) {
+        return Response.redirect(new URL("/", nextUrl));
+      }
 
-  const isGuest = guestRegex.test(session?.user?.email ?? "");
+      return true;
+    },
+  },
+} satisfies NextAuthConfig;
 
-  if (session && !isGuest && ["/login", "/register"].includes(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  return NextResponse.next();
-});
+export const { auth: middleware } = NextAuth(authConfig);
 
 export const config = {
   matcher: [
