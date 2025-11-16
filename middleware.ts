@@ -1,8 +1,6 @@
 import NextAuth from "next-auth";
 import type { NextAuthConfig } from "next-auth";
 
-const guestRegex = /^guest-\d+$/;
-
 // Edge-compatible NextAuth config (no database adapter)
 const authConfig = {
   pages: {
@@ -14,8 +12,17 @@ const authConfig = {
     authorized({ auth, request: { nextUrl } }: { auth: any; request: { nextUrl: any } }) {
       const { pathname } = nextUrl;
 
-      // Playwright ping endpoint
-      if (pathname.startsWith("/ping")) {
+      // Public routes that don't require authentication
+      const publicRoutes = [
+        "/login",
+        "/register",
+        "/privacy",
+        "/terms",
+        "/ping",
+      ];
+
+      // Allow access to public routes
+      if (publicRoutes.some(route => pathname.startsWith(route))) {
         return true;
       }
 
@@ -24,18 +31,25 @@ const authConfig = {
         return true;
       }
 
-      const isLoggedIn = !!auth?.user;
-
-      // Redirect to guest login if not logged in
-      if (!isLoggedIn) {
-        const redirectUrl = encodeURIComponent(nextUrl.toString());
-        return Response.redirect(new URL(`/api/auth/guest?redirectUrl=${redirectUrl}`, nextUrl));
+      // Allow static files and public assets
+      if (
+        pathname.startsWith("/_next") ||
+        pathname.startsWith("/favicon.ico") ||
+        pathname.startsWith("/sitemap.xml") ||
+        pathname.startsWith("/robots.txt")
+      ) {
+        return true;
       }
 
-      const isGuest = guestRegex.test(auth?.user?.email ?? "");
+      const isLoggedIn = !!auth?.user;
 
-      // Redirect logged-in non-guest users away from auth pages
-      if (isLoggedIn && !isGuest && ["/login", "/register"].includes(pathname)) {
+      // Redirect to login if not authenticated
+      if (!isLoggedIn) {
+        return Response.redirect(new URL("/login", nextUrl));
+      }
+
+      // Redirect logged-in users away from auth pages
+      if (isLoggedIn && ["/login", "/register"].includes(pathname)) {
         return Response.redirect(new URL("/", nextUrl));
       }
 
