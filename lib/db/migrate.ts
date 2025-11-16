@@ -7,7 +7,12 @@ import postgres from "postgres";
 
 const runMigrate = async () => {
   if (!process.env.POSTGRES_URL) {
-    throw new Error("POSTGRES_URL is not defined");
+    console.log("⚠️  POSTGRES_URL is not defined, skipping migrations");
+    console.log("   (This is normal for local builds without .env.local)");
+    console.log(
+      "   Migrations will run automatically on Vercel where env vars are set"
+    );
+    process.exit(0);
   }
 
   const connection = postgres(process.env.POSTGRES_URL, { max: 1 });

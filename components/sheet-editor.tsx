@@ -3,10 +3,10 @@
 import { useTheme } from "next-themes";
 import { parse, unparse } from "papaparse";
 import { memo, useEffect, useMemo, useState } from "react";
-import DataGrid, { textEditor } from "react-data-grid";
+import DataGrid from "react-data-grid";
 import { cn } from "@/lib/utils";
 
-import "react-data-grid/lib/styles.css";
+// CSS is included in react-data-grid v6, no separate import needed
 
 type SheetEditorProps = {
   content: string;
@@ -57,7 +57,7 @@ const PureSpreadsheetEditor = ({ content, saveContent }: SheetEditorProps) => {
     const dataColumns = Array.from({ length: MIN_COLS }, (_, i) => ({
       key: i.toString(),
       name: String.fromCharCode(65 + i),
-      renderEditCell: textEditor,
+      editable: true,
       width: 120,
       cellClass: cn("border-t dark:bg-zinc-950 dark:text-zinc-50", {
         "border-l": i !== 0,
@@ -95,7 +95,13 @@ const PureSpreadsheetEditor = ({ content, saveContent }: SheetEditorProps) => {
     return unparse(data);
   };
 
-  const handleRowsChange = (newRows: any[]) => {
+  const handleGridRowsUpdated = ({ fromRow, toRow, updated }: any) => {
+    const newRows = localRows.slice();
+
+    for (let i = fromRow; i <= toRow; i++) {
+      newRows[i] = { ...newRows[i], ...updated };
+    }
+
     setLocalRows(newRows);
 
     const updatedData = newRows.map((row) => {
@@ -107,23 +113,16 @@ const PureSpreadsheetEditor = ({ content, saveContent }: SheetEditorProps) => {
   };
 
   return (
-    <DataGrid
-      className={resolvedTheme === "dark" ? "rdg-dark" : "rdg-light"}
-      columns={columns}
-      defaultColumnOptions={{
-        resizable: true,
-        sortable: true,
-      }}
-      enableVirtualization
-      onCellClick={(args) => {
-        if (args.column.key !== "rowNumber") {
-          args.selectCell(true);
-        }
-      }}
-      onRowsChange={handleRowsChange}
-      rows={localRows}
-      style={{ height: "100%" }}
-    />
+    <div className={resolvedTheme === "dark" ? "rdg-dark" : "rdg-light"}>
+      <DataGrid
+        columns={columns}
+        enableCellSelect={true}
+        minHeight={500}
+        onGridRowsUpdated={handleGridRowsUpdated}
+        rowGetter={(i: number) => localRows[i]}
+        rowsCount={localRows.length}
+      />
+    </div>
   );
 };
 

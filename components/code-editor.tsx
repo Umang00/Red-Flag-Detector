@@ -1,10 +1,10 @@
 "use client";
 
+import { basicSetup } from "@codemirror/basic-setup";
 import { python } from "@codemirror/lang-python";
 import { EditorState, Transaction } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { EditorView } from "@codemirror/view";
-import { basicSetup } from "codemirror";
 import { memo, useEffect, useRef } from "react";
 import type { Suggestion } from "@/lib/db/schema";
 
