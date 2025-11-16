@@ -4,31 +4,193 @@ import {
   foreignKey,
   index,
   integer,
+  json,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   text,
   timestamp,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import type { AppUsage } from "../usage";
 
-// Users table (extends NextAuth defaults)
+// ============================================================================
+// ORIGINAL AI CHATBOT SCHEMA (KEEP FOR COMPATIBILITY)
+// ============================================================================
+
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
-  email: varchar("email", { length: 64 }).notNull().unique(),
+  email: varchar("email", { length: 64 }).notNull(),
+  password: varchar("password", { length: 64 }),
+  // Red Flag Detector additions
   emailVerified: timestamp("emailVerified"),
   name: text("name"),
   image: text("image"),
-  password: varchar("password", { length: 64 }), // For email/password authentication (hashed with bcryptjs)
-  verificationToken: text("verificationToken"), // For email verification
+  verificationToken: text("verificationToken"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
 
 export type User = InferSelectModel<typeof user>;
 
-// Accounts table (for OAuth providers)
+export const chat = pgTable("Chat", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  title: text("title").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  visibility: varchar("visibility", { enum: ["public", "private"] })
+    .notNull()
+    .default("private"),
+  lastContext: jsonb("lastContext").$type<AppUsage | null>(),
+});
+
+export type Chat = InferSelectModel<typeof chat>;
+
+// DEPRECATED: The following schema is deprecated and will be removed in the future.
+// Read the migration guide at https://chat-sdk.dev/docs/migration-guides/message-parts
+export const messageDeprecated = pgTable("Message", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  chatId: uuid("chatId")
+    .notNull()
+    .references(() => chat.id),
+  role: varchar("role").notNull(),
+  content: json("content").notNull(),
+  createdAt: timestamp("createdAt").notNull(),
+});
+
+export type MessageDeprecated = InferSelectModel<typeof messageDeprecated>;
+
+export const message = pgTable("Message_v2", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  chatId: uuid("chatId")
+    .notNull()
+    .references(() => chat.id),
+  role: varchar("role").notNull(),
+  parts: json("parts").notNull(),
+  attachments: json("attachments").notNull(),
+  createdAt: timestamp("createdAt").notNull(),
+});
+
+export type DBMessage = InferSelectModel<typeof message>;
+
+// DEPRECATED: The following schema is deprecated and will be removed in the future.
+// Read the migration guide at https://chat-sdk.dev/docs/migration-guides/message-parts
+export const voteDeprecated = pgTable(
+  "Vote",
+  {
+    chatId: uuid("chatId")
+      .notNull()
+      .references(() => chat.id),
+    messageId: uuid("messageId")
+      .notNull()
+      .references(() => messageDeprecated.id),
+    isUpvoted: boolean("isUpvoted").notNull(),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.chatId, table.messageId] }),
+    };
+  }
+);
+
+export type VoteDeprecated = InferSelectModel<typeof voteDeprecated>;
+
+export const vote = pgTable(
+  "Vote_v2",
+  {
+    chatId: uuid("chatId")
+      .notNull()
+      .references(() => chat.id),
+    messageId: uuid("messageId")
+      .notNull()
+      .references(() => message.id),
+    isUpvoted: boolean("isUpvoted").notNull(),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.chatId, table.messageId] }),
+    };
+  }
+);
+
+export type Vote = InferSelectModel<typeof vote>;
+
+export const document = pgTable(
+  "Document",
+  {
+    id: uuid("id").notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    title: text("title").notNull(),
+    content: text("content"),
+    kind: varchar("text", { enum: ["text", "code", "image", "sheet"] })
+      .notNull()
+      .default("text"),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.id, table.createdAt] }),
+    };
+  }
+);
+
+export type Document = InferSelectModel<typeof document>;
+
+export const suggestion = pgTable(
+  "Suggestion",
+  {
+    id: uuid("id").notNull().defaultRandom(),
+    documentId: uuid("documentId").notNull(),
+    documentCreatedAt: timestamp("documentCreatedAt").notNull(),
+    originalText: text("originalText").notNull(),
+    suggestedText: text("suggestedText").notNull(),
+    description: text("description"),
+    isResolved: boolean("isResolved").notNull().default(false),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.id] }),
+    documentRef: foreignKey({
+      columns: [table.documentId, table.documentCreatedAt],
+      foreignColumns: [document.id, document.createdAt],
+    }),
+  })
+);
+
+export type Suggestion = InferSelectModel<typeof suggestion>;
+
+export const stream = pgTable(
+  "Stream",
+  {
+    id: uuid("id").notNull().defaultRandom(),
+    chatId: uuid("chatId").notNull(),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.id] }),
+    chatRef: foreignKey({
+      columns: [table.chatId],
+      foreignColumns: [chat.id],
+    }),
+  })
+);
+
+export type Stream = InferSelectModel<typeof stream>;
+
+// ============================================================================
+// RED FLAG DETECTOR ADDITIONS
+// ============================================================================
+
+// Accounts table (for OAuth providers - GitHub, etc.)
 export const account = pgTable("Account", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   userId: uuid("userId")
@@ -42,7 +204,7 @@ export const account = pgTable("Account", {
 
 export type Account = InferSelectModel<typeof account>;
 
-// Conversations table (renamed from Chat, with category and red flag score)
+// Conversations table (Red Flag Detector specific - with category and red flag score)
 export const conversation = pgTable(
   "Conversation",
   {
@@ -67,9 +229,9 @@ export const conversation = pgTable(
 
 export type Conversation = InferSelectModel<typeof conversation>;
 
-// Messages table (with red flag data)
-export const message = pgTable(
-  "Message",
+// Red Flag Detector Messages (separate from AI chatbot messages)
+export const redFlagMessage = pgTable(
+  "RedFlagMessage",
   {
     id: uuid("id").primaryKey().notNull().defaultRandom(),
     conversationId: uuid("conversationId")
@@ -82,11 +244,11 @@ export const message = pgTable(
     deletedAt: timestamp("deletedAt"), // Soft delete
   },
   (table) => ({
-    conversationIdIdx: index("idx_messages_conversation_id").on(table.conversationId),
+    conversationIdIdx: index("idx_red_flag_messages_conversation_id").on(table.conversationId),
   })
 );
 
-export type Message = InferSelectModel<typeof message>;
+export type RedFlagMessage = InferSelectModel<typeof redFlagMessage>;
 
 // Uploaded Files table (for Cloudinary tracking)
 export const uploadedFile = pgTable(
