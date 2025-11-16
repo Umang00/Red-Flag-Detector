@@ -1,11 +1,9 @@
-import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
-config({
-  path: ".env.local",
-});
+// Note: Environment variables are automatically loaded by Next.js in development
+// and provided by Vercel in production. No need for dotenv.
 
 const runMigrate = async () => {
   if (!process.env.POSTGRES_URL) {
