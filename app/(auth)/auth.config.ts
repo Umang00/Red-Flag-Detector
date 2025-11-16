@@ -1,4 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
+import type { Session } from "next-auth";
+import type { NextRequest } from "next/server";
 
 export const authConfig = {
   pages: {
@@ -10,7 +12,8 @@ export const authConfig = {
     // while this file is also used in non-Node.js environments
   ],
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request }: { auth: Session | null; request: NextRequest }) {
+      const { nextUrl } = request;
       const { pathname } = nextUrl;
 
       // Public routes that don't require authentication
