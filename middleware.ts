@@ -11,7 +11,7 @@ const authConfig = {
   },
   providers: [],
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request: { nextUrl } }: { auth: any; request: { nextUrl: any } }) {
       const { pathname } = nextUrl;
 
       // Playwright ping endpoint
