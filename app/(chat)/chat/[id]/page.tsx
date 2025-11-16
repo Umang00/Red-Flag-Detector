@@ -8,6 +8,8 @@ import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
 import { convertToUIMessages } from "@/lib/utils";
 
+export const runtime = "nodejs"; // Force Node.js runtime for auth with database/bcrypt
+
 export default async function Page(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const { id } = params;

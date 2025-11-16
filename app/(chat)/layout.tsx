@@ -6,6 +6,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { auth } from "../(auth)/auth";
 
 export const experimental_ppr = true;
+export const runtime = "nodejs"; // Force Node.js runtime for auth with database/bcrypt
 
 export default async function Layout({
   children,

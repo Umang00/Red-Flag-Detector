@@ -6,6 +6,8 @@ import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { generateUUID } from "@/lib/utils";
 import { auth } from "../(auth)/auth";
 
+export const runtime = "nodejs"; // Force Node.js runtime for auth with database/bcrypt
+
 export default async function Page() {
   const session = await auth();
 
